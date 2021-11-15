@@ -1,6 +1,6 @@
 
 -------------------------------------
--- Core Author:M,theTyke
+-- Core Author:M, theTyke
 -------------------------------------
 
 TinyTooltip = {}
@@ -24,7 +24,6 @@ local BASE_MOVEMENT_SPEED = BASE_MOVEMENT_SPEED or 7
 --BLZ function (Fixed for classic WOW)
 local UnitEffectiveLevel = UnitEffectiveLevel or function() end
 local UnitGroupRolesAssigned = UnitGroupRolesAssigned or function() end
-local UnitGroupRolesAssigned = UnitGroupRolesAssigned  or function() end
 local UnitIsQuestBoss = UnitIsQuestBoss or function() end
 local IsFlying = IsFlying or function() end
 
@@ -49,17 +48,19 @@ addon.tooltips = {
 
 -- 圖標集
 addon.icons = {
-    Alliance  = "|TInterface\\TargetingFrame\\UI-PVP-ALLIANCE:14:14:0:0:64:64:10:36:2:38|t",
-    Horde     = "|TInterface\\TargetingFrame\\UI-PVP-HORDE:14:14:0:0:64:64:4:38:2:36|t",
-    Neutral   = "|TInterface\\Timer\\Panda-Logo:14|t",
-    pvp       = "|TInterface\\TargetingFrame\\UI-PVP-FFA:14:14:0:0:64:64:10:36:0:38|t",
-    class     = "|TInterface\\TargetingFrame\\UI-Classes-Circles:14:14:0:0:256:256:%d:%d:%d:%d|t",
-    battlepet = "|TInterface\\Timer\\Panda-Logo:15|t",
-    pettype   = "|TInterface\\TargetingFrame\\PetBadge-%s:14|t",
-    questboss = "|TInterface\\TargetingFrame\\PortraitQuestBadge:0|t",
-    TANK      = "|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:14:14:0:0:64:64:0:19:22:41|t",
-    HEALER    = "|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:14:14:0:0:64:64:20:39:1:20|t",
-    DAMAGER   = "|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:14:14:0:0:64:64:20:39:22:41|t",
+    Alliance   = "|TInterface\\TargetingFrame\\UI-PVP-ALLIANCE:14:14:0:0:64:64:10:36:2:38|t",
+    Horde      = "|TInterface\\TargetingFrame\\UI-PVP-HORDE:14:14:0:0:64:64:4:38:2:36|t",
+    Neutral    = "|TInterface\\Timer\\Panda-Logo:14|t",
+    pvp        = "|TInterface\\TargetingFrame\\UI-PVP-FFA:14:14:0:0:64:64:10:36:0:38|t",
+    class      = "|TInterface\\TargetingFrame\\UI-Classes-Circles:14:14:0:0:256:256:%d:%d:%d:%d|t",
+    battlepet  = "|TInterface\\Timer\\Panda-Logo:15|t",
+    pettype    = "|TInterface\\TargetingFrame\\PetBadge-%s:14|t",
+    questboss  = "|TInterface\\TargetingFrame\\PortraitQuestBadge:0|t",
+    friend     = "|TInterface\\AddOns\\TinyTooltip\\texture\\friend:14:14:0:0:32:32:1:30:2:30|t",
+    bnetfriend = "|TInterface\\ChatFrame\\UI-ChatIcon-BattleNet:14:14:0:0:32:32:1:30:2:30|t",
+    TANK       = "|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:14:14:0:0:64:64:0:19:22:41|t",
+    HEALER     = "|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:14:14:0:0:64:64:20:39:1:20|t",
+    DAMAGER    = "|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:14:14:0:0:64:64:20:39:22:41|t",
 }
 
 -- 背景
@@ -71,7 +72,54 @@ addon.bgs = {
     marble  = "Interface\\FrameGeneral\\UI-Background-Marble",
 }
 
--- 配置 (elements鍵不合併)
+--配置 (对elements鍵的值进行合并校验,不含factionBig,npcTitle键)
+local function AutoValidateElements(src, dst)
+    local keys = {}
+    for k, v in ipairs(dst) do
+        keys[k] = true
+        for i = #v, 1, -1 do
+            if (not src[v[i]]) then
+                tremove(v, i)
+            else
+                keys[v[i]] = true
+            end
+        end
+    end
+    for k, v in pairs(src) do
+        if (type(k) ~= "number" and not dst[k]) then
+            dst[k] = v
+            if (k == "factionBig" or k == "npcTitle") then
+            elseif (not keys[k]) then
+                tinsert(dst[1], 1, k)
+            end
+        end
+    end
+    return dst
+end
+
+--字符型数字键转为数字键
+function addon:FixNumericKey(t)
+    local key
+    local tbl = {}
+    for k, v in pairs(t) do
+        if (type(k) == "string" and string.match(k,"^[1-9]%d*$")) then
+            key = tonumber(k)
+            t[k] = nil
+            tbl[key] = v
+        end
+    end
+    for k, v in pairs(tbl) do
+        if (not t[k]) then t[k] = v end
+    end
+    for k, v in pairs(t) do
+        if (type(v) == "table") then
+            t[k] = self:FixNumericKey(v)
+        end
+    end
+    return t
+end
+
+-- 配置合併
 function addon:MergeVariable(src, dst)
     dst.version = src.version
     for k, v in pairs(src) do
@@ -79,6 +127,8 @@ function addon:MergeVariable(src, dst)
             dst[k] = v
         elseif (type(dst[k]) == "table" and k~="elements") then
             self:MergeVariable(v, dst[k])
+        elseif (type(dst[k]) == "table" and k=="elements") then
+            dst[k] = AutoValidateElements(v, dst[k])
         end
     end
     return dst
@@ -225,6 +275,18 @@ function addon:GetClassIcon(class)
     return format(self.icons.class, x1*256, x2*256, y1*256, y2*256)
 end
 
+--好友图标
+function addon:GetFriendIcon(unit)
+    if (UnitIsPlayer(unit)) then
+        local guid = UnitGUID(unit)
+        if (guid and guid~=UnitGUID("player") and not C_BattleNet == nil and C_BattleNet.GetAccountInfoByGUID(guid)) then
+            return self.icons.bnetfriend
+        elseif (guid and C_FriendList.IsFriend(guid)) then
+            return self.icons.friend
+        end
+    end
+end
+
 -- 戰寵
 function addon:GetBattlePet(unit)
     if (UnitIsWildBattlePet(unit) or UnitIsBattlePetCompanion(unit)) then
@@ -318,6 +380,7 @@ function addon:GetUnitInfo(unit)
     t.classIcon    = self:GetClassIcon(class)
     t.roleIcon     = self:GetRoleIcon(unit)
     t.questIcon    = self:GetQuestBossIcon(unit)
+    t.friendIcon   = self:GetFriendIcon(unit)
     --t.battlepetIcon = self:GetBattlePet(unit)
     t.factionName  = factionName
     t.role         = role ~= "NONE" and role
@@ -497,7 +560,7 @@ addon.filterfunc.samerealm = function(raw)
 end
 
 addon.filterfunc.samecrossrealm = function(raw)
-    return UnitRealmRelationship(raw.unit) == LE_REALM_RELATION_SAME
+    return UnitRealmRelationship(raw.unit) ~= LE_REALM_RELATION_COALESCED
 end
 
 addon.filterfunc.inpvp = function(raw)
@@ -520,147 +583,132 @@ addon.filterfunc.sameguild = function(raw)
 end
 
 LibEvent:attachTrigger("tooltip.scale", function(self, frame, scale)
-    if (not frame == nil) then
-        frame:SetScale(scale)
-    end
+    frame:SetScale(scale)
 end)
 
 LibEvent:attachTrigger("tooltip.anchor.cursor", function(self, frame, parent)
-    if (not frame == nil) then
-        frame:SetOwner(parent, "ANCHOR_CURSOR")
-    end
+    frame:SetOwner(parent, "ANCHOR_CURSOR")
 end)
 
 LibEvent:attachTrigger("tooltip.anchor.cursor.right", function(self, frame, parent, offsetX, offsetY)
-    if (not frame == nil) then
-        frame:SetOwner(parent, "ANCHOR_CURSOR_RIGHT", tonumber(offsetX) or 30, tonumber(offsetY) or -12)
-    end
+    frame:SetOwner(parent, "ANCHOR_CURSOR_RIGHT", tonumber(offsetX) or 30, tonumber(offsetY) or -12)
 end)
 
 LibEvent:attachTrigger("tooltip.anchor.static", function(self, frame, parent, offsetX, offsetY, anchorPoint)
     local anchor = select(2, frame:GetPoint())
-    if (anchor == UIParent and not frame == nil) then
+    if (anchor == UIParent) then
         frame:ClearAllPoints()
         frame:SetPoint(anchorPoint or "BOTTOMRIGHT", UIParent, anchorPoint or "BOTTOMRIGHT", tonumber(offsetX) or (-CONTAINER_OFFSET_X-13), tonumber(offsetY) or CONTAINER_OFFSET_Y)
     end
 end)
 
 LibEvent:attachTrigger("tooltip.anchor.none", function(self, frame, parent)
-    if (not frame == nil) then
-        frame:SetOwner(parent, "ANCHOR_NONE")
-        frame:Hide()
-    end
+    frame:SetOwner(parent, "ANCHOR_NONE")
+    frame:Hide()
 end)
 
 LibEvent:attachTrigger("tooltip.style.mask", function(self, frame, boolean)
     LibEvent:trigger("tooltip.style.init", frame)
-    if (not frame == nil or not frame.style == nil) then
-        if (not frame == nil or not frame.style == nil) then
-            frame.style.mask:SetShown(boolean)
-        end
-    end
+    frame.style.mask:SetShown(boolean)
 end)
 
 LibEvent:attachTrigger("tooltip.style.background", function(self, frame, r, g, b, a)
     LibEvent:trigger("tooltip.style.init", frame)
-    if (not frame == nil or not frame.style == nil) then
-        local rr, gg, bb, aa = frame.style:GetBackdropColor()
-        if (rr ~= r or gg ~= g or bb ~= b or aa ~= a) then
-            frame.style:SetBackdropColor(r or rr, g or gg, b or bb, a or aa)
-        end
+    local rr, gg, bb, aa = frame.style:GetBackdropColor()
+    if (rr ~= r or gg ~= g or bb ~= b or aa ~= a) then
+        if (frame.SetBackdrop) then frame:SetBackdrop(nil) end
+        frame.style:SetBackdropColor(r or rr, g or gg, b or bb, a or aa)
     end
 end)
 
 LibEvent:attachTrigger("tooltip.style.bgfile", function(self, frame, bgvalue)
     LibEvent:trigger("tooltip.style.init", frame)
-    if (not frame == nil or not frame.style == nil) then
-        local bgfile = addon:GetBgFile(bgvalue)
-        local backdrop = frame.style:GetBackdrop()
-        local r, g, b, a = frame.style:GetBackdropColor()
-        local rr, gg, bb, aa = frame.style:GetBackdropBorderColor()
-        if (backdrop.bgFile ~= bgfile) then
-            backdrop.bgFile = bgfile
-            frame.style:SetBackdrop(backdrop)
-            frame.style:SetBackdropColor(r, g, b, a)
-            frame.style:SetBackdropBorderColor(rr, gg, bb, aa)
-        end
+    local bgfile = addon:GetBgFile(bgvalue)
+    local backdrop = frame.style:GetBackdrop()
+    local r, g, b, a = frame.style:GetBackdropColor()
+    local rr, gg, bb, aa = frame.style:GetBackdropBorderColor()
+    if (backdrop.bgFile ~= bgfile) then
+        backdrop.bgFile = bgfile
+        frame.style:SetBackdrop(backdrop)
+        frame.style:SetBackdropColor(r, g, b, a)
+        frame.style:SetBackdropBorderColor(rr, gg, bb, aa)
     end
 end)
 
 LibEvent:attachTrigger("tooltip.style.border.size", function(self, frame, size)
     LibEvent:trigger("tooltip.style.init", frame)
-    if (not frame == nil or not frame.style == nil) then
     local backdrop = frame.style:GetBackdrop()
     local r, g, b, a = frame.style:GetBackdropColor()
-        if (backdrop.edgeFile == "Interface\\Buttons\\WHITE8X8") then
-            backdrop.edgeSize = size
-            backdrop.insets.top = size
-            backdrop.insets.left = size
-            backdrop.insets.right = size
-            backdrop.insets.bottom = size
-            frame.style:SetBackdrop(backdrop)
-            frame.style:SetBackdropColor(r, g, b, a)
-            frame.style.inside:SetPoint("TOPLEFT", frame.style, "TOPLEFT", size, -size)
-            frame.style.inside:SetPoint("BOTTOMRIGHT", frame.style, "BOTTOMRIGHT", -size, size)
-        end
+    if (backdrop.edgeFile == "Interface\\Buttons\\WHITE8X8") then
+        backdrop.edgeSize = size
+        backdrop.insets.top = size
+        backdrop.insets.left = size
+        backdrop.insets.right = size
+        backdrop.insets.bottom = size
+        frame.style:SetBackdrop(backdrop)
+        frame.style:SetBackdropColor(r, g, b, a)
+        frame.style.inside:SetPoint("TOPLEFT", frame.style, "TOPLEFT", size, -size)
+        frame.style.inside:SetPoint("BOTTOMRIGHT", frame.style, "BOTTOMRIGHT", -size, size)
     end
 end)
 
 LibEvent:attachTrigger("tooltip.style.border.corner", function(self, frame, corner)
     LibEvent:trigger("tooltip.style.init", frame)
-    if (not frame == nil or not frame.style == nil) then
-        local backdrop = frame.style:GetBackdrop()
-        local r, g, b, a = frame.style:GetBackdropColor()
-        if (corner == "angular") then
-            backdrop.edgeFile = "Interface\\Buttons\\WHITE8X8"
-            backdrop.edgeSize = min(backdrop.edgeSize, 6)
-            frame.style.mask:SetPoint("TOPLEFT", 1, -1)
-            frame.style.mask:SetPoint("BOTTOMRIGHT", frame.style, "TOPRIGHT", -1, -32)
-            frame.style.outside:Show()
-            frame.style.inside:Show()
-            frame.style.inside:SetPoint("TOPLEFT", frame.style, "TOPLEFT", backdrop.edgeSize, -backdrop.edgeSize)
-            frame.style.inside:SetPoint("BOTTOMRIGHT", frame.style, "BOTTOMRIGHT", -backdrop.edgeSize, backdrop.edgeSize)
-        elseif (LibMedia and LibMedia:IsValid("border", corner)) then
-            backdrop.edgeFile = LibMedia:Fetch("border", corner)
-            backdrop.edgeSize = 14
-            backdrop.insets.top = 3
-            backdrop.insets.left = 3
-            backdrop.insets.right = 3
-            backdrop.insets.bottom = 3
-            frame.style.mask:SetPoint("TOPLEFT", 3, -3)
-            frame.style.mask:SetPoint("BOTTOMRIGHT", frame.style, "TOPRIGHT", -3, -32)
-            frame.style.inside:Hide()
-            frame.style.outside:Hide()
-        else
-            backdrop.edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border"
-            backdrop.edgeSize = 14
-            backdrop.insets.top = 3
-            backdrop.insets.left = 3
-            backdrop.insets.right = 3
-            backdrop.insets.bottom = 3
-            frame.style.mask:SetPoint("TOPLEFT", 3, -3)
-            frame.style.mask:SetPoint("BOTTOMRIGHT", frame.style, "TOPRIGHT", -3, -32)
-            frame.style.inside:Hide()
-            frame.style.outside:Hide()
-        end
-        frame.style:SetBackdrop(backdrop)
-        frame.style:SetBackdropColor(r, g, b, a)
+    local backdrop = frame.style:GetBackdrop()
+    local r, g, b, a = frame.style:GetBackdropColor()
+    if (corner == "angular") then
+        backdrop.edgeFile = "Interface\\Buttons\\WHITE8X8"
+        backdrop.edgeSize = min(backdrop.edgeSize, 6)
+        frame.style.mask:SetPoint("TOPLEFT", 1, -1)
+        frame.style.mask:SetPoint("BOTTOMRIGHT", frame.style, "TOPRIGHT", -1, -32)
+        frame.style.outside:Show()
+        frame.style.inside:Show()
+        frame.style.inside:SetPoint("TOPLEFT", frame.style, "TOPLEFT", backdrop.edgeSize, -backdrop.edgeSize)
+        frame.style.inside:SetPoint("BOTTOMRIGHT", frame.style, "BOTTOMRIGHT", -backdrop.edgeSize, backdrop.edgeSize)
+    elseif (LibMedia and LibMedia:IsValid("border", corner)) then
+        backdrop.edgeFile = LibMedia:Fetch("border", corner)
+        backdrop.edgeSize = 14
+        backdrop.insets.top = 3
+        backdrop.insets.left = 3
+        backdrop.insets.right = 3
+        backdrop.insets.bottom = 3
+        frame.style.mask:SetPoint("TOPLEFT", 3, -3)
+        frame.style.mask:SetPoint("BOTTOMRIGHT", frame.style, "TOPRIGHT", -3, -32)
+        frame.style.inside:Hide()
+        frame.style.outside:Hide()
+    else
+        backdrop.edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border"
+        backdrop.edgeSize = 14
+        backdrop.insets.top = 3
+        backdrop.insets.left = 3
+        backdrop.insets.right = 3
+        backdrop.insets.bottom = 3
+        frame.style.mask:SetPoint("TOPLEFT", 3, -3)
+        frame.style.mask:SetPoint("BOTTOMRIGHT", frame.style, "TOPRIGHT", -3, -32)
+        frame.style.inside:Hide()
+        frame.style.outside:Hide()
     end
+    frame.style:SetBackdrop(backdrop)
+    frame.style:SetBackdropColor(r, g, b, a)
 end)
 
 LibEvent:attachTrigger("tooltip.style.border.color", function(self, frame, r, g, b, a)
     LibEvent:trigger("tooltip.style.init", frame)
-    if (not frame == nil or not frame.style == nil) then
-        local rr, gg, bb, aa = frame.style:GetBackdropBorderColor()
-        if (rr ~= r or gg ~= g or bb ~= b or aa ~= a) then
-            frame.style:SetBackdropBorderColor(r or rr, g or gg, b or bb, a or aa)
-        end
+    local rr, gg, bb, aa = frame.style:GetBackdropBorderColor()
+    if (rr ~= r or gg ~= g or bb ~= b or aa ~= a) then
+        if (frame.SetBackdrop) then frame:SetBackdrop(nil) end
+        frame.style:SetBackdropBorderColor(r or rr, g or gg, b or bb, a or aa)
     end
 end)
 
 local defaultHeaderFont, defaultHeaderSize, defaultHeaderFlag = GameTooltipHeaderText:GetFont()
 LibEvent:attachTrigger("tooltip.style.font.header", function(self, frame, fontObject, fontSize, fontFlag)
     local font, size, flag = GameTooltipHeaderText:GetFont()
+    if (fontObject == "default" and fontSize == "default" and fontFlag == "default") then
+        if (size == defaultHeaderSize and flag == defaultHeaderFlag) then
+            return
+        end
+    end
     font = addon:GetFont(fontObject, defaultHeaderFont)
     if (fontSize == "default") then
         size = defaultHeaderSize
@@ -677,7 +725,7 @@ end)
 
 local defaultBodyFont, defaultBodySize, defaultBodyFlag = GameTooltipText:GetFont()
 LibEvent:attachTrigger("tooltip.style.font.body", function(self, frame, fontObject, fontSize, fontFlag)
-    local font, size, flag = GameTooltipHeaderText:GetFont()
+    local font, size, flag = GameTooltipText:GetFont()
     font = addon:GetFont(fontObject, defaultBodyFont)
     if (fontSize == "default") then
         size = defaultBodySize
@@ -745,27 +793,29 @@ LibEvent:attachTrigger("tooltip.statusbar.position", function(self, position, of
 end)
 
 LibEvent:attachTrigger("tooltip.style.init", function(self, tip)
-    if (tip == nil or tip.style == nil) then return end
+    if (not tip or tip.style) then return end
     local backdrop = {
         bgFile   = "Interface\\RaidFrame\\UI-RaidFrame-GroupBg",
         insets   = {left = 3, right = 3, top = 3, bottom = 3},
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         edgeSize = 14,
     }
-    tip:SetBackdrop(nil)
-    tip.style = CreateFrame("Frame", nil, tip)
+    if (tip.SetBackdrop) then
+        tip:SetBackdrop(nil)
+    end
+    tip.style = CreateFrame("Frame", nil, tip, BackdropTemplateMixin and "BackdropTemplate" or nil)
     tip.style:SetFrameLevel(tip:GetFrameLevel())
     tip.style:SetAllPoints()
     tip.style:SetBackdrop(backdrop)
     tip.style:SetBackdropColor(0, 0, 0, 0.9)
     tip.style:SetBackdropBorderColor(0.6, 0.6, 0.6, 0.8)
-    tip.style.inside = CreateFrame("Frame", nil, tip.style)
+    tip.style.inside = CreateFrame("Frame", nil, tip.style, BackdropTemplateMixin and "BackdropTemplate" or nil)
     tip.style.inside:SetBackdrop({edgeSize=1,edgeFile="Interface\\Buttons\\WHITE8X8"})
     tip.style.inside:SetPoint("TOPLEFT", tip.style, "TOPLEFT", 1, -1)
     tip.style.inside:SetPoint("BOTTOMRIGHT", tip.style, "BOTTOMRIGHT", -1, 1)
     tip.style.inside:SetBackdropBorderColor(0.1, 0.1, 0.1, 0.8)
     tip.style.inside:Hide()
-    tip.style.outside = CreateFrame("Frame", nil, tip.style)
+    tip.style.outside = CreateFrame("Frame", nil, tip.style, BackdropTemplateMixin and "BackdropTemplate" or nil)
     tip.style.outside:SetBackdrop({edgeSize=1,edgeFile="Interface\\Buttons\\WHITE8X8"})
     tip.style.outside:SetPoint("TOPLEFT", tip.style, "TOPLEFT", -1, 1)
     tip.style.outside:SetPoint("BOTTOMRIGHT", tip.style, "BOTTOMRIGHT", 1, -1)
@@ -803,7 +853,7 @@ LibEvent:attachTrigger("tooltip.style.init", function(self, tip)
     if (tip:HasScript("OnTooltipSetQuest")) then
         tip:HookScript("OnTooltipSetQuest", function(self) LibEvent:trigger("tooltip:quest", self) end)
     end
-    if (tip == GameTooltip) then
+    if (tip == GameTooltip or tip.identity == "diy") then
         tip.GetBackdrop = function(self) return self.style:GetBackdrop() end
         tip.GetBackdropColor = function(self) return self.style:GetBackdropColor() end
         tip.GetBackdropBorderColor = function(self) return self.style:GetBackdropBorderColor() end
@@ -811,7 +861,7 @@ LibEvent:attachTrigger("tooltip.style.init", function(self, tip)
             tip.BigFactionIcon = tip:CreateTexture(nil, "OVERLAY")
             tip.BigFactionIcon:SetPoint("TOPRIGHT", tip, "TOPRIGHT", 18, 0)
             tip.BigFactionIcon:SetBlendMode("ADD")
-            tip.BigFactionIcon:SetScale(0.25)
+            tip.BigFactionIcon:SetScale(0.24)
             tip.BigFactionIcon:SetAlpha(0.40)
         end
     end
