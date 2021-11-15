@@ -2,7 +2,7 @@
 ## Title: TinyTooltipClassic
 ## Notes: TinyTooltipClassic
 ## Author: M, theTyke
-## Version: 11401.1
+## Version: 11401.1-ERA
 ## SavedVariables: BigTipDB
 ## SavedVariablesPerCharacter: TinyTooltipCharacterDB
 
