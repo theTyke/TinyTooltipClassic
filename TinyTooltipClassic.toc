@@ -1,8 +1,8 @@
-## Interface: 11401
-## Title: TinyTooltipClassic
-## Notes: TinyTooltipClassic
+## Interface: 20502
+## Title: TinyTooltipClassic-TBC
+## Notes: TinyTooltipClassic-TBC
 ## Author: M, theTyke
-## Version: 8.2.3
+## Version: 8.2.3-TBC
 ## SavedVariables: BigTipDB
 ## SavedVariablesPerCharacter: TinyTooltipCharacterDB
 
