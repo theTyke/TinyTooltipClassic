@@ -2,7 +2,7 @@
 ## Title: TinyTooltipClassic-TBC
 ## Notes: TinyTooltipClassic-TBC
 ## Author: M, theTyke
-## Version: 8.2.3-TBC
+## Version: 20502.1-TB
 ## SavedVariables: BigTipDB
 ## SavedVariablesPerCharacter: TinyTooltipCharacterDB
 
@@ -18,7 +18,9 @@ Item.lua
 Spell.lua
 Quest.lua
 LinkID.lua
+Mount.lua
 SkinFrames.lua
 
+libs\Template.xml
 locales\locales.xml
 Options.lua
